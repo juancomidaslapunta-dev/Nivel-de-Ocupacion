@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/*.py", "use": "@vercel/python" },
+    { "src": "index.html", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/upload",     "dest": "/api/upload.py" },
+    { "src": "/api/regenerate", "dest": "/api/regenerate.py" },
+    { "src": "/api/report",     "dest": "/api/report.py" },
+    { "src": "/api/version",    "dest": "/api/version.py" },
+    { "src": "/api/status",     "dest": "/api/status.py" },
+    { "src": "/(.*)",           "dest": "/index.html" }
+  ]
+}

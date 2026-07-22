@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control — Ocupación Logística</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+    :root {
+      --primary-mid: #2563EB;
+      --bg:          #0F172A;
+      --card-bg:     #1E293B;
+      --card-border: #334155;
+      --text:        #F1F5F9;
+      --text-muted:  #94A3B8;
+      --text-dim:    #475569;
+      --green-lt:    #4ADE80;
+      --amber-lt:    #FCD34D;
+      --red-lt:      #FCA5A5;
+      --radius:      10px;
+      --sidebar-w:   270px;
+    }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Fira Sans', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; font-size: 13px;
+    }
+
+    /* topbar */
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 20px; height: 52px;
+      background: #0A0F1E; border-bottom: 1px solid #1E293B;
+      flex-shrink: 0;
+    }
+    .topbar-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .95rem; color: #93C5FD; }
+    .topbar-sep  { flex: 1; }
+    #ver-badge   { font-family: 'Fira Code', monospace; font-size: .72rem; color: var(--text-dim); }
+    #ts-badge    {
+      background: #1E293B; border: 1px solid #334155;
+      color: var(--text-muted); font-size: .72rem;
+      padding: 3px 10px; border-radius: 20px;
+      font-family: 'Fira Code', monospace;
+    }
+
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* sidebar */
+    .sidebar {
+      width: var(--sidebar-w); flex-shrink: 0;
+      background: var(--bg); border-right: 1px solid #1E293B;
+      display: flex; flex-direction: column;
+      overflow-y: auto; padding: 16px 14px 24px; gap: 14px;
+    }
+    .section-label {
+      font-size: .65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .09em; color: var(--text-dim); padding: 0 4px; margin-bottom: 2px;
+    }
+
+    /* upload cards */
+    .upload-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: var(--radius); padding: 12px;
+      display: flex; flex-direction: column; gap: 8px;
+      transition: border-color 150ms;
+    }
+    .upload-card.drag-over { border-color: var(--primary-mid); background: #1A2744; }
+    .upload-card-header { display: flex; align-items: center; gap: 8px; }
+    .upload-icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .icon-blue { background: #1E3A8A; color: #93C5FD; }
+    .icon-teal { background: #0F3B3B; color: #5EEAD4; }
+    .upload-title { font-size: .8rem; font-weight: 600; }
+    .upload-sub   { font-size: .68rem; color: var(--text-muted); line-height: 1.4; }
+    .file-status  { display: flex; align-items: center; gap: 6px; font-size: .7rem; color: var(--text-dim); min-height: 18px; }
+    .file-status.loaded { color: var(--green-lt); }
+    .file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 185px; font-family: 'Fira Code', monospace; font-size: .68rem; }
+    .upload-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 7px;
+      background: #1E293B; border: 1px dashed #334155;
+      border-radius: 6px; cursor: pointer;
+      color: var(--text-muted); font-size: .75rem; font-weight: 500;
+      transition: background 150ms, border-color 150ms, color 150ms;
+      font-family: 'Fira Sans', sans-serif;
+    }
+    .upload-btn:hover { background: #243047; border-color: var(--primary-mid); color: #93C5FD; }
+    input[type="file"] { display: none; }
+
+    /* divider */
+    .divider { height: 1px; background: #1E293B; margin: 2px 0; }
+
+    /* label card */
+    .label-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: var(--radius); padding: 12px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .label-hint { font-size: .68rem; color: var(--text-muted); line-height: 1.4; }
+    .label-input {
+      background: #0F172A; border: 1px solid #334155;
+      color: var(--text); font-family: 'Fira Sans', sans-serif;
+      font-size: .8rem; padding: 7px 10px; border-radius: 6px;
+      width: 100%; outline: none; transition: border-color 150ms;
+    }
+    .label-input::placeholder { color: #475569; font-style: italic; }
+    .label-input:focus { border-color: var(--primary-mid); }
+
+    /* actualizar */
+    .btn-update {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 11px;
+      background: var(--primary-mid); border: none; border-radius: var(--radius);
+      color: #fff; font-size: .85rem; font-weight: 700; cursor: pointer;
+      font-family: 'Fira Sans', sans-serif;
+      transition: background 150ms, transform 100ms, box-shadow 150ms;
+      box-shadow: 0 2px 8px rgba(37,99,235,.35);
+    }
+    .btn-update:hover   { background: #1D4ED8; box-shadow: 0 4px 14px rgba(37,99,235,.45); }
+    .btn-update:active  { transform: scale(.98); }
+    .btn-update:disabled { background: #334155; color: #64748B; cursor: not-allowed; box-shadow: none; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* log */
+    .log-box {
+      background: #0A0F1E; border: 1px solid #1E293B;
+      border-radius: 8px; padding: 10px 12px;
+      font-family: 'Fira Code', monospace; font-size: .7rem;
+      color: var(--text-muted); line-height: 1.7;
+      max-height: 130px; overflow-y: auto; flex-shrink: 0;
+    }
+    .log-entry { display: block; }
+    .log-ok   { color: var(--green-lt); }
+    .log-err  { color: var(--red-lt); }
+    .log-info { color: #93C5FD; }
+    .log-warn { color: var(--amber-lt); }
+
+    /* report */
+    .report-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #F8FAFC; }
+    .report-toolbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px; background: #1E293B; border-bottom: 1px solid #334155; flex-shrink: 0;
+    }
+    .report-toolbar span { font-size: .72rem; color: var(--text-muted); }
+    .tb-label-badge {
+      font-family: 'Fira Code', monospace; font-size: .7rem;
+      padding: 2px 8px; background: #0F172A; border: 1px solid #334155;
+      border-radius: 12px; color: #93C5FD;
+      max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tb-sep { flex: 1; }
+    #report-frame { flex: 1; border: none; width: 100%; }
+    .tb-ts { font-family: 'Fira Code', monospace; font-size: .7rem; color: #475569; }
+
+    /* toast */
+    #toast {
+      position: fixed; bottom: 24px; left: calc(var(--sidebar-w) + 24px);
+      background: #1E293B; border: 1px solid #334155;
+      color: var(--text); padding: 10px 16px; border-radius: 10px;
+      font-size: .8rem; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      opacity: 0; transform: translateY(8px);
+      transition: opacity 200ms, transform 200ms;
+      pointer-events: none; z-index: 100;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.ok  { border-color: #16A34A55; }
+    #toast.err { border-color: #DC262655; }
+
+    @media (max-width: 768px) {
+      :root { --sidebar-w: 100%; }
+      .layout    { flex-direction: column; }
+      .sidebar   { width: 100%; max-height: 55vh; border-right: none; border-bottom: 1px solid #1E293B; }
+      .report-area { flex: 1; min-height: 45vh; }
+      html, body { overflow: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-logo">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+    Ocupación Logística
+  </div>
+  <div class="topbar-sep"></div>
+  <span id="ver-badge">v—</span>
+  <span id="ts-badge">—</span>
+</header>
+
+<div class="layout">
+
+  <aside class="sidebar">
+
+    <div class="section-label">Archivos</div>
+
+    <!-- Stock físico -->
+    <div class="upload-card" id="drop-base" data-type="base">
+      <div class="upload-card-header">
+        <div class="upload-icon icon-blue">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="upload-title">Stock Físico</div>
+          <div class="upload-sub">BASE con inv Fisico · Bodega · Zona</div>
+        </div>
+      </div>
+      <div class="file-status loaded" id="status-base">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="file-name">maestra de codigosv2.xlsx</span>
+      </div>
+      <label class="upload-btn" tabindex="0" role="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+        </svg>
+        Subir .xlsx
+        <input type="file" accept=".xlsx,.xls" data-type="base" onchange="handleUpload(this)">
+      </label>
+    </div>
+
+    <!-- Capacidades -->
+    <div class="upload-card" id="drop-cap" data-type="cap">
+      <div class="upload-card-header">
+        <div class="upload-icon icon-teal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
+        </div>
+        <div>
+          <div class="upload-title">Tabla de Capacidades</div>
+          <div class="upload-sub">template_capacidades.xlsx (opcional)</div>
+        </div>
+      </div>
+      <div class="file-status" id="status-cap">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Usando pestaña inf del maestro
+      </div>
+      <label class="upload-btn" tabindex="0" role="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+        </svg>
+        Subir .xlsx
+        <input type="file" accept=".xlsx,.xls" data-type="cap" onchange="handleUpload(this)">
+      </label>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Etiqueta -->
+    <div class="section-label">Etiqueta del reporte</div>
+    <div class="label-card">
+      <div class="label-hint">Describe qué stock contiene el archivo (aparece en el reporte).</div>
+      <input
+        type="text" id="label-input" class="label-input"
+        placeholder="ej: Promedio Semanal Jul-Sep"
+        maxlength="60"
+        oninput="state.label = this.value"
+      >
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="btn-update" id="btn-update" onclick="triggerRegen()">
+      <svg id="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Actualizar Reporte
+    </button>
+
+    <div class="section-label" style="margin-top:4px">Actividad</div>
+    <div class="log-box" id="log-box" aria-live="polite"></div>
+
+  </aside>
+
+  <main class="report-area">
+    <div class="report-toolbar">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span>reporte_ocupacion_sep.html</span>
+      <span class="tb-label-badge" id="tb-label">—</span>
+      <div class="tb-sep"></div>
+      <span id="tb-ts" class="tb-ts">—</span>
+    </div>
+    <iframe id="report-frame" src="/report" title="Reporte de Ocupación Logística"></iframe>
+  </main>
+
+</div>
+
+<div id="toast" role="alert"></div>
+
+<script>
+  const state = { label: '', version: null };
+
+  function log(msg, cls = 'log-info') {
+    const box = document.getElementById('log-box');
+    const ts  = new Date().toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const el  = document.createElement('span');
+    el.className  = `log-entry ${cls}`;
+    el.textContent = `[${ts}] ${msg}`;
+    box.prepend(el);
+    while (box.children.length > 30) box.removeChild(box.lastChild);
+  }
+
+  let _tt;
+  function toast(msg, type = 'ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = `show ${type}`;
+    clearTimeout(_tt);
+    _tt = setTimeout(() => { el.className = ''; }, 3500);
+  }
+
+  async function handleUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const type = input.dataset.type;
+    const el   = document.getElementById(`status-${type}`);
+    el.className = 'file-status';
+    el.innerHTML = `<span style="color:#FCD34D">Subiendo…</span>`;
+    log(`Subiendo ${type}: ${file.name}`, 'log-warn');
+
+    const fd = new FormData();
+    fd.append('type', type);
+    fd.append('file', file);
+
+    try {
+      const r = await fetch('/upload', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.ok) {
+        el.className = 'file-status loaded';
+        el.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span class="file-name">${file.name}</span>`;
+        log(`${type} cargado: ${file.name}`, 'log-ok');
+        toast(`✓ ${file.name} subido`, 'ok');
+      } else {
+        el.innerHTML = `<span style="color:#FCA5A5">Error al subir</span>`;
+        log(`Error ${type}: ${d.msg}`, 'log-err');
+        toast(`✗ ${d.msg}`, 'err');
+      }
+    } catch (e) {
+      el.innerHTML = `<span style="color:#FCA5A5">Error de red</span>`;
+      log(`Red: ${e}`, 'log-err');
+      toast('✗ Error de red', 'err');
+    }
+    input.value = '';
+  }
+
+  document.querySelectorAll('.upload-card').forEach(card => {
+    card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) handleUpload({ files: [file], dataset: { type: card.dataset.type }, value: '' });
+    });
+  });
+
+  async function triggerRegen() {
+    const btn  = document.getElementById('btn-update');
+    const icon = document.getElementById('btn-icon');
+    btn.disabled = true;
+    icon.classList.add('spin');
+    btn.childNodes[1].textContent = ' Actualizando…';
+    log(`Regenerando label="${state.label || '—'}"`, 'log-info');
+
+    try {
+      const r = await fetch('/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: state.label }),
+      });
+      const d = await r.json();
+      if (d.ok) { log('Reporte actualizado ✓', 'log-ok'); toast('✓ Actualizado', 'ok'); }
+      else       { log(`Error: ${d.msg}`, 'log-err');        toast('✗ Error', 'err'); }
+    } catch (e) {
+      log(`Red: ${e}`, 'log-err'); toast('✗ Error de red', 'err');
+    } finally {
+      btn.disabled = false;
+      icon.classList.remove('spin');
+      btn.childNodes[1].textContent = ' Actualizar Reporte';
+    }
+  }
+
+  (function poll() {
+    fetch('/version?' + Date.now())
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('ver-badge').textContent = `v${d.v}`;
+        document.getElementById('ts-badge').textContent  = d.ts || '—';
+        document.getElementById('tb-ts').textContent     = d.ts || '—';
+        document.getElementById('tb-label').textContent  = d.label || '—';
+        if (state.version !== null && d.v !== state.version) {
+          log(`v${d.v} detectada → recargando`, 'log-ok');
+          document.getElementById('report-frame').src = '/report?' + Date.now();
+        }
+        state.version = d.v;
+      })
+      .catch(() => {})
+      .finally(() => setTimeout(poll, 3000));
+  })();
+
+  log('Panel listo', 'log-ok');
+</script>
+</body>
+</html>

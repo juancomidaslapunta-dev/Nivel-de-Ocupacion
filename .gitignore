@@ -1,0 +1,23 @@
+# Entorno virtual Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Datos generados (no subir al repo)
+reporte_ocupacion_sep.html
+reporte_ocupacion_sep.xlsx
+
+# Archivos de datos sensibles (se suben desde el dashboard)
+maestra de codigosv2.xlsx
+uploads/
+
+# Archivos de sistema Windows
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+*.swp
