@@ -1,20 +1,20 @@
 """
-api/version.py — retorna JSON con versión actual y timestamp
+api/version.py — retorna JSON con versión actual y timestamp (desde Supabase).
 """
-import os
 import json
 from http.server import BaseHTTPRequestHandler
 
-VERSION_FILE = "/tmp/version.json"
+from _store import read_state, StoreError
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        if os.path.exists(VERSION_FILE):
-            with open(VERSION_FILE) as f:
-                data = json.load(f)
-        else:
+        try:
+            st = read_state()
+            data = {"v": st.get("v", 0), "ts": st.get("ts", "—"),
+                    "label": st.get("label", "")}
+        except StoreError:
             data = {"v": 0, "ts": "—", "label": ""}
 
         body = json.dumps(data).encode()

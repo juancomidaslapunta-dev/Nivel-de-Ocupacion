@@ -1,10 +1,11 @@
 """
-api/report.py — sirve el HTML de reporte desde /tmp/reporte_ocupacion_sep.html
+api/report.py — sirve el HTML de reporte desde Supabase Storage.
 """
-import os
 from http.server import BaseHTTPRequestHandler
 
-REPORT_PATH = "/tmp/reporte_ocupacion_sep.html"
+from _store import download_bytes, StoreError
+
+REPORT_OBJECT = "report/reporte.html"
 
 _NO_REPORT_HTML = """<!DOCTYPE html>
 <html lang="es">
@@ -55,8 +56,13 @@ _NO_REPORT_HTML = """<!DOCTYPE html>
 class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        if os.path.exists(REPORT_PATH):
-            data = open(REPORT_PATH, "rb").read()
+        data = None
+        try:
+            data = download_bytes(REPORT_OBJECT)
+        except StoreError:
+            data = None
+
+        if data:
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))

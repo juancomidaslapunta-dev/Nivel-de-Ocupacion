@@ -1,15 +1,15 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "api/*.py", "use": "@vercel/python" },
-    { "src": "index.html", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/api/upload",     "dest": "/api/upload.py" },
-    { "src": "/api/regenerate", "dest": "/api/regenerate.py" },
-    { "src": "/api/report",     "dest": "/api/report.py" },
-    { "src": "/api/version",    "dest": "/api/version.py" },
-    { "src": "/api/status",     "dest": "/api/status.py" },
-    { "src": "/(.*)",           "dest": "/index.html" }
+  "functions": {
+    "api/regenerate.py": {
+      "maxDuration": 60,
+      "includeFiles": "analisis_ocupacion_sep.py"
+    },
+    "api/report.py":   { "maxDuration": 15 },
+    "api/upload.py":   { "maxDuration": 30 },
+    "api/status.py":   { "maxDuration": 10 },
+    "api/version.py":  { "maxDuration": 10 }
+  },
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" }
   ]
 }

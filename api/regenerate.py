@@ -1,41 +1,27 @@
 """
-api/regenerate.py — ejecuta analisis_ocupacion_sep.py con archivos en /tmp/
+api/regenerate.py — ejecuta el análisis EN EL MISMO PROCESO (sin subprocess).
+
+Descarga los archivos desde Supabase Storage a /tmp, corre el pipeline de
+analisis_ocupacion_sep.py importándolo como módulo, y sube el reporte HTML/XLSX
+de vuelta al bucket. Finalmente incrementa la versión en state.json.
 """
 import os
 import sys
 import json
 import time
-import subprocess
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
-TMP_DIR    = "/tmp/uploads"
-OUTPUT_DIR = "/tmp"
-BASE_DIR   = Path(__file__).parent.parent   # raíz del repo
+from _store import (upload_bytes, download_bytes, read_state, write_state,
+                    StoreError)
 
+BASE_DIR = Path(__file__).resolve().parent.parent   # raíz del repo
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
-def _read_active(ftype: str):
-    meta = os.path.join(TMP_DIR, f"{ftype}_active.txt")
-    if os.path.exists(meta):
-        with open(meta) as f:
-            path = f.read().strip()
-        if os.path.exists(path):
-            return path
-    return None
-
-
-def _read_version():
-    vf = os.path.join(OUTPUT_DIR, "version.json")
-    if os.path.exists(vf):
-        with open(vf) as f:
-            return json.load(f)
-    return {"v": 0, "ts": "—", "label": ""}
-
-
-def _write_version(v: int, ts: str, label: str):
-    vf = os.path.join(OUTPUT_DIR, "version.json")
-    with open(vf, "w") as f:
-        json.dump({"v": v, "ts": ts, "label": label}, f)
+TMP_DIR   = "/tmp"
+XLSX_CT   = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+HTML_CT   = "text/html; charset=utf-8"
 
 
 def _send_json(handler, data: dict, status: int = 200):
@@ -48,6 +34,32 @@ def _send_json(handler, data: dict, status: int = 200):
     handler.wfile.write(body)
 
 
+def _run_analysis(base_path: str, cap_path, label: str, display_name: str = None):
+    """Corre el pipeline y devuelve (html_path, xlsx_path)."""
+    import analisis_ocupacion_sep as an
+
+    out_html = os.path.join(TMP_DIR, "reporte_ocupacion_sep.html")
+    out_xlsx = os.path.join(TMP_DIR, "reporte_ocupacion_sep.xlsx")
+
+    # Configurar globales del módulo (equivalente a los args del CLI).
+    # INPUT_FILE se usa solo para mostrar el nombre de origen en el reporte;
+    # la lectura real se hace con la ruta temporal explícita más abajo.
+    an.INPUT_FILE       = display_name or base_path
+    an.CAPACIDADES_FILE = cap_path
+    an.LABEL            = label or ""
+    an.OUTPUT_DIR       = TMP_DIR
+    an.OUTPUT_XLSX      = out_xlsx
+    an.OUTPUT_HTML      = out_html
+
+    xls      = an.pd.ExcelFile(base_path)
+    stock, _ = an.load_sku_master(xls)
+    capacity = an.load_capacity(xls)
+    result   = an.consolidate(stock, capacity)
+    an.write_excel(result, out_xlsx)
+    an.write_html(result, stock, out_html)
+    return out_html, out_xlsx
+
+
 class handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
@@ -58,56 +70,58 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        os.makedirs(TMP_DIR, exist_ok=True)
-
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length)
         try:
             data = json.loads(body) if body else {}
         except Exception:
             data = {}
-
         label = data.get("label", "")
 
-        base_file = _read_active("base")
-        cap_file  = _read_active("cap")
-
-        if not base_file:
-            _send_json(self, {"ok": False, "msg": "No hay archivo de stock. Sube primero el Excel de Stock Físico."}, 400)
-            return
-
-        # Construir comando
-        analysis_py = str(BASE_DIR / "analisis_ocupacion_sep.py")
-        cmd = [sys.executable, analysis_py,
-               "--base",       base_file,
-               "--output-dir", OUTPUT_DIR]
-        if cap_file:
-            cmd += ["--cap", cap_file]
-        if label:
-            cmd += ["--label", label]
-
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=120,
-                cwd=str(BASE_DIR),
-                env={**os.environ, "PYTHONPATH": str(BASE_DIR)},
-            )
-            if result.returncode == 0:
-                cur = _read_version()
-                new_v = cur["v"] + 1
-                ts = time.strftime("%H:%M:%S")
-                _write_version(new_v, ts, label)
-                _send_json(self, {"ok": True, "version": new_v, "ts": ts})
-            else:
-                err = result.stderr[-800:] if result.stderr else "error desconocido"
-                _send_json(self, {"ok": False, "msg": err}, 500)
-        except subprocess.TimeoutExpired:
-            _send_json(self, {"ok": False, "msg": "El análisis tardó demasiado (>120s). Intenta con un archivo más pequeño."}, 500)
-        except Exception as e:
+            state = read_state()
+
+            # Descargar archivos activos desde el bucket
+            base_bytes = download_bytes("uploads/base.xlsx")
+            if base_bytes is None:
+                _send_json(self, {"ok": False, "msg": "No hay archivo de stock. Sube primero el Excel de Stock Físico."}, 400)
+                return
+            base_path = os.path.join(TMP_DIR, "base.xlsx")
+            with open(base_path, "wb") as f:
+                f.write(base_bytes)
+
+            cap_path = None
+            cap_bytes = download_bytes("uploads/cap.xlsx")
+            if cap_bytes is not None:
+                cap_path = os.path.join(TMP_DIR, "cap.xlsx")
+                with open(cap_path, "wb") as f:
+                    f.write(cap_bytes)
+
+            # Ejecutar análisis
+            out_html, out_xlsx = _run_analysis(
+                base_path, cap_path, label, display_name=state.get("base"))
+
+            # Subir resultados al bucket
+            with open(out_html, "rb") as f:
+                upload_bytes("report/reporte.html", f.read(), HTML_CT)
+            if os.path.exists(out_xlsx):
+                with open(out_xlsx, "rb") as f:
+                    upload_bytes("report/reporte.xlsx", f.read(), XLSX_CT)
+
+            # Bump de versión
+            ts = time.strftime("%H:%M:%S")
+            state["v"]     = int(state.get("v", 0)) + 1
+            state["ts"]    = ts
+            state["label"] = label
+            write_state(state)
+
+            _send_json(self, {"ok": True, "version": state["v"], "ts": ts})
+
+        except StoreError as e:
             _send_json(self, {"ok": False, "msg": str(e)}, 500)
+        except Exception as e:
+            import traceback
+            _send_json(self, {"ok": False, "msg": f"{e}", "trace": traceback.format_exc()[-800:]}, 500)
 
     def log_message(self, fmt, *args):
         pass

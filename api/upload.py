@@ -1,18 +1,15 @@
 """
-api/upload.py — recibe archivo Excel (multipart) y lo guarda en /tmp/uploads/
+api/upload.py — recibe archivo Excel (multipart) y lo guarda en Supabase Storage.
 Campos: type (base|cap), file
 """
-import os
 import json
 from http.server import BaseHTTPRequestHandler
 from email import message_from_bytes
 from email.policy import HTTP as EMAIL_HTTP
 
-TMP_DIR = "/tmp/uploads"
+from _store import upload_bytes, read_state, write_state, StoreError
 
-
-def _ensure_tmp():
-    os.makedirs(TMP_DIR, exist_ok=True)
+XLSX_CT = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def _parse_multipart(content_type: str, body: bytes):
@@ -58,7 +55,6 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        _ensure_tmp()
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length)
         ct = self.headers.get("Content-Type", "")
@@ -69,26 +65,27 @@ class handler(BaseHTTPRequestHandler):
 
         fields, files = _parse_multipart(ct, body)
         ftype = fields.get("type", "base")
+        if ftype not in ("base", "cap"):
+            ftype = "base"
 
         if "file" not in files:
             _send_json(self, {"ok": False, "msg": "Campo 'file' faltante"}, 400)
             return
 
         orig_name, file_bytes = files["file"]
-        dest = os.path.join(TMP_DIR, f"{ftype}_{orig_name}")
-        with open(dest, "wb") as f:
-            f.write(file_bytes)
-
-        # Guardar referencia del archivo activo
-        meta_path = os.path.join(TMP_DIR, f"{ftype}_active.txt")
-        with open(meta_path, "w") as f:
-            f.write(dest)
+        try:
+            upload_bytes(f"uploads/{ftype}.xlsx", file_bytes, XLSX_CT)
+            state = read_state()
+            state[ftype] = orig_name
+            write_state(state)
+        except StoreError as e:
+            _send_json(self, {"ok": False, "msg": str(e)}, 500)
+            return
 
         _send_json(self, {
             "ok": True,
             "type": ftype,
             "file": orig_name,
-            "path": dest,
             "size": len(file_bytes),
         })
 
