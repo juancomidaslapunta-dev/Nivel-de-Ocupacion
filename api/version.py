@@ -2,20 +2,22 @@
 api/version.py — retorna JSON con versión actual y timestamp (desde Supabase).
 """
 import json
+import traceback
 from http.server import BaseHTTPRequestHandler
-
-from _store import read_state, StoreError
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
+            from _store import read_state
             st = read_state()
             data = {"v": st.get("v", 0), "ts": st.get("ts", "—"),
                     "label": st.get("label", "")}
-        except StoreError:
-            data = {"v": 0, "ts": "—", "label": ""}
+        except Exception as e:
+            data = {"v": 0, "ts": "—", "label": "",
+                    "debug": f"{type(e).__name__}: {e}",
+                    "trace": traceback.format_exc()[-1200:]}
 
         body = json.dumps(data).encode()
         self.send_response(200)
