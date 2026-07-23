@@ -2,12 +2,12 @@
   "functions": {
     "api/regenerate.py": {
       "maxDuration": 60,
-      "includeFiles": "analisis_ocupacion_sep.py"
+      "includeFiles": "{api/_store.py,analisis_ocupacion_sep.py}"
     },
-    "api/report.py":   { "maxDuration": 15 },
-    "api/upload.py":   { "maxDuration": 30 },
-    "api/status.py":   { "maxDuration": 10 },
-    "api/version.py":  { "maxDuration": 10 }
+    "api/report.py":   { "maxDuration": 15, "includeFiles": "api/_store.py" },
+    "api/upload.py":   { "maxDuration": 30, "includeFiles": "api/_store.py" },
+    "api/status.py":   { "maxDuration": 10, "includeFiles": "api/_store.py" },
+    "api/version.py":  { "maxDuration": 10, "includeFiles": "api/_store.py" }
   },
   "rewrites": [
     { "source": "/", "destination": "/index.html" }
