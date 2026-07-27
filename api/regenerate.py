@@ -12,7 +12,7 @@ import time
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
-from _store import (upload_bytes, download_bytes, read_state, write_state,
+from api._store import (upload_bytes, download_bytes, read_state, write_state,
                     StoreError)
 
 BASE_DIR = Path(__file__).resolve().parent.parent   # raíz del repo

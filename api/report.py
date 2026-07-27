@@ -3,7 +3,7 @@ api/report.py — sirve el HTML de reporte desde Supabase Storage.
 """
 from http.server import BaseHTTPRequestHandler
 
-from _store import download_bytes, StoreError
+from api._store import download_bytes, StoreError
 
 REPORT_OBJECT = "report/reporte.html"
 

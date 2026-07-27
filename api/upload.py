@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 from email import message_from_bytes
 from email.policy import HTTP as EMAIL_HTTP
 
-from _store import upload_bytes, read_state, write_state, StoreError
+from api._store import upload_bytes, read_state, write_state, StoreError
 
 XLSX_CT = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

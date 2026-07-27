@@ -4,7 +4,7 @@ api/status.py — retorna estado de archivos activos y versión (desde Supabase)
 import json
 from http.server import BaseHTTPRequestHandler
 
-from _store import read_state, StoreError
+from api._store import read_state, StoreError
 
 
 class handler(BaseHTTPRequestHandler):

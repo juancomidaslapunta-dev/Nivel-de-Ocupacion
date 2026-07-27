@@ -10,7 +10,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            from _store import read_state
+            from api._store import read_state
             st = read_state()
             data = {"v": st.get("v", 0), "ts": st.get("ts", "—"),
                     "label": st.get("label", "")}
